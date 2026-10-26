@@ -1,0 +1,8 @@
+{
+  "status": "awaiting_official_documents",
+  "bank": "Т-Банк",
+  "topic": 37,
+  "documents": [],
+  "required_fields_per_document": ["filename", "title", "product", "url", "sha256", "pages", "text_verified"],
+  "note": "Добавить настоящие источники после снятия сетевого ограничения. Не использовать синтетические тестовые тексты как документы банка."
+}

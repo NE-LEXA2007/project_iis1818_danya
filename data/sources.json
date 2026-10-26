@@ -1,8 +1,59 @@
 {
-  "status": "awaiting_official_documents",
-  "bank": "Т-Банк",
+  "status": "verified",
+  "bank": "Райффайзенбанк",
   "topic": 37,
-  "documents": [],
-  "required_fields_per_document": ["filename", "title", "product", "url", "sha256", "pages", "text_verified"],
-  "note": "Добавить настоящие источники после снятия сетевого ограничения. Не использовать синтетические тестовые тексты как документы банка."
+  "downloaded_at": "2026-10-26",
+  "documents": [
+    {
+      "filename": "raiffeisen_cash_general.pdf",
+      "title": "Общие условия обслуживания счетов, вкладов и потребительских кредитов граждан АО «Райффайзенбанк»: титул, термины и раздел 8. Действуют с 19.10.2026.",
+      "product": "cash_loan",
+      "url": "https://www.raiffeisen.ru/common/img/uploaded/files/retail/creditcard/ou_rus.pdf",
+      "sha256": "8f4f2d418a9438863c74dc6f45b535485aac154304246b9996530490db9bbb4c",
+      "original_sha256": "d773884b6a588ffdb62ce7015175f0990019645de64ea625d629c33cc8f3277c",
+      "pages": 21,
+      "original_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76
+      ],
+      "text_verified": true
+    },
+    {
+      "filename": "raiffeisen_cash_precontract.pdf",
+      "title": "Преддоговорное информирование о предоставлении потребительского кредита",
+      "product": "cash_loan",
+      "url": "https://www.raiffeisen.ru/static/common/DLPI/Preddogovornoye_sept.pdf",
+      "sha256": "d814758f3afede9bb6d61300d70f35792bf47a76e8411ad843a66afbc3cb8309",
+      "original_sha256": "d814758f3afede9bb6d61300d70f35792bf47a76e8411ad843a66afbc3cb8309",
+      "pages": 5,
+      "original_pages": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "text_verified": true
+    }
+  ],
+  "note": "Первый PDF — извлечение оригинальных страниц 1–14 и 70–76; ссылки в ответах относятся к страницам извлечения. Документы разных редакций: при конфликте требуется уточнение, не объединение ставок."
 }

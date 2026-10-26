@@ -25,6 +25,7 @@ orchestrator.py — ядро системы: конечный автомат, п
 """
 
 import logging
+import re
 
 import guardrails
 import memory
@@ -41,37 +42,35 @@ BLOCKED_REPLY = "Запрос отклонён слоем безопасност
 class Orchestrator:
     """Оркестратор ролей на конечном автомате."""
 
-    # --- Роли. Одна заполнена как образец, вторую добавляете вы (П3). ---
+    # Аналитик уточняет продукт; специалисты работают с разделами условий.
     ROLES: dict[str, dict] = {
         "analyst": {
-            "description": "ищет факты в базе знаний и отвечает со ссылками на источники",
-            "temperature": 0.2,   # факты — низкая температура
-            "filters": {},        # {} = искать по всему индексу
+            "description": "уточняет продукт и находит общие условия кредитования",
+            "temperature": 0.15,
+            "filters": {},
         },
-        # TODO (П3): вторая роль. Например:
-        # "editor": {
-        #     "description": "переписывает ответ аналитика в нужном тоне и формате",
-        #     "temperature": 0.7,
-        #     "filters": {},
-        # },
+        "repayment": {
+            "description": "объясняет порядок досрочного погашения",
+            "temperature": 0.1,
+            "filters": {"category": "early_repayment"},
+        },
+        "penalties": {
+            "description": "сверяет последствия просрочки с условиями продукта",
+            "temperature": 0.05,
+            "filters": {"category": "penalties"},
+        },
     }
-
     INITIAL_ROLE = "analyst"
     FALLBACK_ROLE = "analyst"
-
-    # --- Граф переходов: из какой роли в какие можно перейти (П3). ---
-    TRANSITIONS: dict[str, set[str]] = {
-        "analyst": {"analyst"},
-        # TODO (П3): опишите переходы для своих ролей.
-        # Автомат нужен именно для того, чтобы не любой переход был разрешён:
-        # например, из "editor" нельзя уйти в "editor" — редактировать нечего,
-        # пока аналитик не нашёл факты.
+    # От штрафов нельзя сразу перейти к досрочному погашению и наоборот:
+    # сначала аналитик должен уточнить, есть ли просроченная задолженность.
+    TRANSITIONS = {
+        "analyst": {"analyst", "repayment", "penalties"},
+        "repayment": {"analyst", "repayment"},
+        "penalties": {"analyst", "penalties"},
     }
-
-    # --- Какой интент какой ролью обслуживается (П3). ---
-    INTENT_TO_ROLE: dict[str, str] = {
-        "question": "analyst",
-        # TODO (П3): например "rewrite": "editor", "summarize": "editor"
+    INTENT_TO_ROLE = {
+        "question": "analyst", "early_repayment": "repayment", "penalties": "penalties",
     }
 
     def __init__(self):
@@ -94,7 +93,13 @@ class Orchestrator:
         На нераспознанной фразе верните "question" — пусть система отвечает,
         а не отказывается.
         """
-        raise NotImplementedError("П3: реализуйте определение интента")
+        value = text.casefold().replace("ё", "е")
+        # Просрочка приоритетнее досрочного погашения: требуется сверка долга.
+        if re.search(r"просроч|неустой|штраф|пен[яию]|не (?:внес|заплат)|опозда", value):
+            return "penalties"
+        if re.search(r"досроч|раньше срока|больше.*(?:платеж|надо)|закрыть кредит", value):
+            return "early_repayment"
+        return "question"
 
     # --- Готовая механика: менять не нужно ---
 

@@ -26,6 +26,7 @@ orchestrator.py — ядро системы: конечный автомат, п
 
 import logging
 import re
+import config
 
 import guardrails
 import memory
@@ -146,6 +147,17 @@ class Orchestrator:
             chunks = self.tools.search_filtered(text, filters)
         else:
             chunks = self.tools.search(text)
+
+        # При сопоставлении документов обычная top-k выдача может содержать
+        # только один файл. Запрашиваем каждый источник отдельно через MCP.
+        if re.search(r"преддоговорн.*общ|общ.*преддоговорн|сравн|сопостав|соотнос", text, re.I):
+            diverse = []
+            for source in ("raiffeisen_cash_general.pdf", "raiffeisen_cash_precontract.pdf"):
+                diverse.extend(self.tools.search_filtered(text, {**filters, "source": source}, k=2))
+            unique = {}
+            for chunk in diverse + chunks:
+                unique.setdefault((chunk.source, chunk.page, chunk.text), chunk)
+            chunks = list(unique.values())[:config.TOP_K]
 
         # Контекст переезжает между ролями: при переключении новая роль видит
         # и свои фрагменты, и то, что нашла предыдущая, — иначе разговор рвётся.

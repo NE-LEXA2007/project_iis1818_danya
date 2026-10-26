@@ -83,7 +83,7 @@ class OllamaClient:
             response = requests.post(
                 f"{self.host}/api/chat",
                 json={"model": self.model, "messages": messages, "stream": False,
-                      "options": {"temperature": max(0.01, temperature)}},
+                      "options": {"temperature": max(0.01, temperature), "num_ctx": 8192, "num_predict": 512}},
                 timeout=(10, 180),
             )
             response.raise_for_status()

@@ -24,7 +24,8 @@ mcp_server.py и test_suite.py.
 """
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
+from contextlib import closing
 
 import config
 from contracts import Message
@@ -51,8 +52,9 @@ def create_schema() -> None:
 
     Подсказка: SCHEMA выше уже написана — выполните её и не забудьте commit().
     """
-    # TODO (П5): выполнить SCHEMA
-    return None
+    with closing(connect()) as connection, connection:
+        connection.executescript(SCHEMA)
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, id)")
 
 
 def save(session_id: str, role: str, content: str) -> None:
@@ -62,8 +64,14 @@ def save(session_id: str, role: str, content: str) -> None:
     Пользуйтесь параметрами запроса (?, ?, ?), а не конкатенацией строк —
     иначе получите SQL-инъекцию в дополнение к prompt-инъекции из П7.
     """
-    # TODO (П5): вставить реплику в messages
-    return None
+    if role not in {"user", "assistant", "system"}:
+        raise ValueError("Неизвестная роль сообщения")
+    create_schema()
+    with closing(connect()) as connection, connection:
+        connection.execute(
+            "INSERT INTO messages(session_id, role, content, timestamp) VALUES (?, ?, ?, ?)",
+            (session_id, role, content, datetime.now(timezone.utc).isoformat(timespec="seconds")),
+        )
 
 
 def window(session_id: str, n: int = config.MEMORY_WINDOW) -> list[Message]:
@@ -72,11 +80,21 @@ def window(session_id: str, n: int = config.MEMORY_WINDOW) -> list[Message]:
     Ловушка: ORDER BY id DESC LIMIT n даёт последние n, но в обратном порядке.
     Разверните результат перед возвратом, иначе LLM прочитает диалог задом наперёд.
     """
-    # TODO (П5): выбрать последние n сообщений сессии
-    return []
+    if n < 0:
+        raise ValueError("Размер окна не может быть отрицательным")
+    if n == 0:
+        return []
+    create_schema()
+    with closing(connect()) as connection:
+        rows = connection.execute(
+            "SELECT role, content, timestamp FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT ?",
+            (session_id, n),
+        ).fetchall()
+    return [Message(*row) for row in reversed(rows)]
 
 
 def clear(session_id: str) -> None:
     """Удалить историю сессии. Нужна кнопке очистки в app.py (П6)."""
-    # TODO (П5): удалить реплики сессии
-    return None
+    create_schema()
+    with closing(connect()) as connection, connection:
+        connection.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))

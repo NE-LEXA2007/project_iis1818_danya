@@ -26,59 +26,75 @@ llm_client.py — доступ к языковой модели за общим 
 работа, сданная на LLM_BACKEND=fake, не принимается.
 """
 
+import logging
+import math
+import re
+
+import requests
 import config
 from contracts import LLMClient
 
+log = logging.getLogger(__name__)
+UNAVAILABLE = "Языковая модель недоступна. Проверьте подключение и настройки выбранного провайдера."
+
+
+def estimate_tokens(text: str) -> int:
+    return math.ceil(len(text) / 3)
+
 
 class GigaChatClient:
-    """Клиент Сбер GigaChat API."""
-
     def __init__(self):
+        from gigachat import GigaChat
         self.model = config.GIGACHAT_MODEL
-        # TODO (П4): создать клиент
-        # from gigachat import GigaChat
-        # self._client = GigaChat(credentials=config.GIGACHAT_CREDENTIALS,
-        #                         model=self.model,
-        #                         verify_ssl_certs=config.GIGACHAT_VERIFY_SSL)
+        self._client = GigaChat(
+            credentials=config.GIGACHAT_CREDENTIALS,
+            model=self.model,
+            verify_ssl_certs=config.GIGACHAT_VERIFY_SSL,
+            timeout=60,
+        )
 
     def generate(self, messages: list[dict], temperature: float = 0.3) -> str:
-        """Отправить диалог в GigaChat и вернуть текст ответа.
-
-        SDK принимает структуру вида {"messages": [...], "temperature": ...}.
-        Ответ лежит в response.choices[0].message.content.
-        Не забудьте обработать сетевую ошибку: занятие не должно падать трассировкой.
-        """
-        raise NotImplementedError("П4: реализуйте вызов GigaChat")
+        try:
+            response = self._client.chat({
+                "messages": messages, "temperature": max(0.01, temperature),
+            })
+            return response.choices[0].message.content
+        except Exception as error:
+            # Исключение SDK может содержать HTTP-заголовки: выводим только тип.
+            log.warning("GigaChat недоступен (%s)", type(error).__name__)
+            return UNAVAILABLE
 
     def count_tokens(self, text: str) -> int:
-        """Оценка длины в токенах.
-
-        У GigaChat есть метод tokens_count. Если он недоступен, дайте оценку:
-        для русского текста примерно один токен на 3 символа. Точность здесь
-        не главное — важно видеть порядок величины и связать его со стоимостью.
-        """
-        raise NotImplementedError("П4: реализуйте подсчёт токенов")
+        if not text:
+            return 0
+        try:
+            return self._client.tokens_count([text])[0].tokens
+        except Exception:
+            return estimate_tokens(text)
 
 
 class OllamaClient:
-    """Клиент локального инференса через Ollama."""
-
     def __init__(self):
         self.model = config.OLLAMA_MODEL
-        self.host = config.OLLAMA_HOST
+        self.host = config.OLLAMA_HOST.rstrip("/")
 
     def generate(self, messages: list[dict], temperature: float = 0.3) -> str:
-        """POST на {host}/api/chat с телом {"model", "messages", "stream": False}.
-
-        Ответ — в data["message"]["content"].
-        У reasoning-моделей ответ приходит с блоком <think>...</think> — решите,
-        показывать его пользователю или вырезать, и обоснуйте выбор на защите.
-        """
-        raise NotImplementedError("П4: реализуйте вызов Ollama")
+        try:
+            response = requests.post(
+                f"{self.host}/api/chat",
+                json={"model": self.model, "messages": messages, "stream": False,
+                      "options": {"temperature": max(0.01, temperature)}},
+                timeout=(10, 180),
+            )
+            response.raise_for_status()
+            content = response.json()["message"]["content"]
+            # Служебное рассуждение не является ответом с подтверждёнными условиями.
+            return re.sub(r"<think>.*?</think>", "", content, flags=re.S).strip()
+        except (requests.RequestException, ValueError, KeyError, TypeError):
+            return UNAVAILABLE
 
     def count_tokens(self, text: str) -> int:
-        """Оценка длины в токенах — та же логика, что и в GigaChatClient."""
-        raise NotImplementedError("П4: реализуйте подсчёт токенов")
+        return estimate_tokens(text)
 
 
 def build_client() -> LLMClient:

@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_DIR = Path(__file__).parent
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = Path(os.getenv("IIS_DATA_DIR", str(BASE_DIR / "data")))
 RAW_DIR = DATA_DIR / "raw"
 CHROMA_DIR = DATA_DIR / "chroma"
 DB_PATH = DATA_DIR / "memory.db"
@@ -27,7 +27,7 @@ SECURITY_LOG = BASE_DIR / "security_logs.txt"
 # --- Параметры RAG (подбираются на П2) ---
 COLLECTION_NAME = "knowledge_base"
 EMBEDDING_MODEL = "intfloat/multilingual-e5-small"
-CHUNK_SIZE = 512      # символов в чанке
+CHUNK_SIZE = 768      # символов в чанке
 CHUNK_OVERLAP = 64    # перекрытие между соседними чанками
 TOP_K = 5             # сколько чанков возвращает поиск
 
@@ -38,9 +38,9 @@ MEMORY_WINDOW = 10    # сколько последних сообщений у�
 LLM_BACKEND = os.getenv("LLM_BACKEND", "gigachat")
 GIGACHAT_CREDENTIALS = os.getenv("GIGACHAT_CREDENTIALS", "")
 GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat")
-GIGACHAT_VERIFY_SSL = os.getenv("GIGACHAT_VERIFY_SSL", "false").lower() == "true"
+GIGACHAT_VERIFY_SSL = os.getenv("GIGACHAT_VERIFY_SSL", "true").lower() == "true"
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "deepseek-r1:1.5b")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 
 # --- Экономика (П8) ---
 # Цена за 1 000 000 токенов в рублях. Тарифы меняются — подставьте актуальные

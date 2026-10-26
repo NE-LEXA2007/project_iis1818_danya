@@ -37,6 +37,8 @@ ingest.py — сбор исходных данных и наполнение в�
 """
 
 import hashlib
+import re
+import unicodedata
 from pathlib import Path
 
 import config
@@ -71,7 +73,32 @@ def clean_text(text: str) -> str:
     Подсказка: начните с re.sub(r"-\n", "", text) и r"\s+" -> " ", посмотрите
     на результат глазами и добавьте правила под свои исходные данные.
     """
-    raise NotImplementedError("П2: реализуйте очистку текста")
+    text = unicodedata.normalize("NFKC", text).replace("\r\n", "\n")
+    text = re.sub(r"(?<=\w)[-\u00ad]\s*\n\s*(?=[а-яa-z])", "", text)
+    text = text.replace("\u00ad", "").replace("\x0c", "\n\n")
+    lines = []
+    for line in text.splitlines():
+        line = re.sub(r"[ \t]+", " ", line).strip()
+        line = re.sub(r'^АО «Райффайзенбанк»\s+\d+\s*', '', line).strip()
+        if line.startswith('Общие условия обслуживания счетов, вкладов и потребительских кредитов граждан АО'):
+            continue
+        line = re.sub(r'^(\d+(?:\.\d+)*\.)(?=[А-ЯA-Z])', r'\1 ', line)
+        if re.fullmatch(r"(?:стр(?:аница)?\.?\s*)?\d+(?:\s*(?:из|/)\s*\d+)?", line, re.I):
+            continue
+        if re.fullmatch(r"(?:АО|ПАО) [«\"]?Т[‐-]?Банк[»\"]?", line, re.I):
+            continue
+        lines.append(line)
+    # Нумерованные условия и заголовки остаются самостоятельными абзацами.
+    result, paragraph = [], []
+    for line in lines + [""]:
+        boundary = not line or re.match(r"^(?:\d+(?:\.\d+)*[.)]?\s|Раздел\s|Приложение\s)", line, re.I)
+        if boundary and paragraph:
+            result.append(" ".join(paragraph))
+            paragraph = []
+        if line:
+            paragraph.append(line)
+    return "\n\n".join(result)
+
 
 
 def chunk_text(text: str, size: int = config.CHUNK_SIZE,
@@ -84,7 +111,27 @@ def chunk_text(text: str, size: int = config.CHUNK_SIZE,
     Следите за двумя вещами: шаг сдвига равен size - overlap (не size), и
     overlap обязан быть меньше size, иначе цикл не сойдётся.
     """
-    raise NotImplementedError("П2: реализуйте нарезку с перекрытием")
+    if size <= 0 or not 0 <= overlap < size:
+        raise ValueError("Нужно size > 0 и 0 <= overlap < size")
+    text = text.strip()
+    if not text:
+        return []
+    chunks, start = [], 0
+    while start < len(text):
+        end = min(start + size, len(text))
+        if end < len(text):
+            # Не режем пункт, если его граница находится во второй половине окна.
+            boundary = text.rfind("\n\n", start + max(size // 2, overlap + 1), end)
+            if boundary >= 0:
+                end = boundary + 2
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        if end == len(text):
+            break
+        start = end - overlap
+    return chunks
+
 
 
 def detect_category(text: str, source: str) -> str:
@@ -97,7 +144,18 @@ def detect_category(text: str, source: str) -> str:
     Достаточно правил по имени файла и ключевым словам — LLM здесь не нужна.
     Пустых категорий быть не должно: заведите рубрику по умолчанию.
     """
-    raise NotImplementedError("П2: реализуйте рубрикацию")
+    value = (source + " " + text).casefold().replace("ё", "е")
+    rules = {
+        "early_repayment": r"досроч|early_repayment",
+        "penalties": r"неустой|просроч|штраф|пен[яию]|penalties",
+        "rates": r"ставк|процент|полная стоимость|пск|rates",
+        "terms": r"срок|платеж|погашени|terms",
+    }
+    for category, pattern in rules.items():
+        if re.search(pattern, value):
+            return category
+    return "general"
+
 
 
 # --- Сборка индекса: готова ---

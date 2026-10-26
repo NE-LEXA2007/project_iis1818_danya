@@ -1,0 +1,23 @@
+[
+  {
+    "size": 512,
+    "overlap": 64,
+    "chunks": 399,
+    "hit_rate_5": 1.0,
+    "hit_rate_1": 1.0
+  },
+  {
+    "size": 768,
+    "overlap": 64,
+    "chunks": 261,
+    "hit_rate_5": 1.0,
+    "hit_rate_1": 1.0
+  },
+  {
+    "size": 768,
+    "overlap": 128,
+    "chunks": 283,
+    "hit_rate_5": 1.0,
+    "hit_rate_1": 1.0
+  }
+]
